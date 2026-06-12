@@ -2,29 +2,40 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// PR ke diffs ko Gemini ko bhejo aur structured review pao
 const reviewCode = async (prTitle, files) => {
-  // Sirf patch (diff) data combine karo, bahut bade files skip karo
   const diffText = files
-    .filter((f) => f.patch) // binary files mein patch nahi hota
-    .map((f) => `### File: ${f.filename}\n${f.patch}`)
+    .filter((f) => f.patch)
+    .map((f) => `### File: ${f.filename} (+${f.additions}/-${f.deletions})\n${f.patch}`)
     .join('\n\n')
-    .slice(0, 30000); // Gemini limit ke liye truncate karo
+    .slice(0, 30000);
 
   if (!diffText) {
-    return '🤖 **DevFlow AI Review**\n\nIs PR mein review karne layak code changes nahi mile (sirf binary/large files honge).';
+    return '🤖 **DevFlow AI Review**\n\n✅ **Verdict: Approve**\n\nNo reviewable code changes found (binary/large files only).';
   }
 
-  const prompt = `Tum ek senior software engineer ho jo pull requests review karte ho.
+  const prompt = `Tum ek senior software engineer ho jo pull requests review karte ho. Tumhara review concise, actionable, aur professional hona chahiye - jaisa CodeRabbit ya GitHub Copilot review karta hai.
 
 PR Title: "${prTitle}"
 
-Neeche diye gaye code changes (diff format mein) ko review karo aur ye batao:
-1. **Summary** - PR mein kya change hua hai (2-3 lines)
-2. **Issues** - Koi bugs, security issues, ya bad practices (agar koi nahi to "No major issues found")
-3. **Suggestions** - Code quality improve karne ke liye 1-3 suggestions
+Neeche diye gaye code changes (diff format, multiple files ho sakte hain) ko **holistically** review karo - sirf individual lines nahi, balki files ke beech relationships, consistency, aur overall design bhi check karo.
 
-Markdown format mein concise jawab do. Bahut lamba mat likho.
+Apna jawab EXACTLY ye structure mein do (markdown):
+
+## Verdict
+Ek line mein: "✅ Approve", "💬 Comment", ya "⚠️ Request Changes" - reason ke saath.
+
+## Summary
+2-3 lines mein bata kya change hua hai aur kyun.
+
+## Issues
+Har issue ko severity tag ke saath likho: **[Critical]**, **[Major]**, ya **[Minor]**.
+- Critical: security vulnerabilities, data loss, breaking bugs
+- Major: logic errors, performance issues, missing error handling
+- Minor: style, naming, minor improvements
+Agar koi issue nahi: "No issues found."
+
+## Suggestions
+1-3 bullet points - concrete, actionable improvements.
 
 Code changes:
 ${diffText}`;

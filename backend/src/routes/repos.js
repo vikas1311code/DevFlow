@@ -6,5 +6,6 @@ const { authenticate } = require('../middleware/auth');
 router.use(authenticate);
 router.post('/connect', connectRepo);
 router.get('/', getRepos);
+router.delete('/:repoId', require('../controllers/repoController').disconnectRepo);
 
 module.exports = router;

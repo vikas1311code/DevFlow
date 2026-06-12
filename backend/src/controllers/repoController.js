@@ -47,4 +47,18 @@ const getRepos = async (req, res) => {
   }
 };
 
-module.exports = { connectRepo, getRepos };
+const disconnectRepo = async (req, res) => {
+  const { repoId } = req.params;
+  try {
+    const result = await query(
+      'UPDATE repositories SET is_active = false WHERE id = $1 AND owner_id = $2 RETURNING *',
+      [repoId, req.user.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Repo nahi mila' });
+    res.json({ disconnected: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = { connectRepo, getRepos, disconnectRepo };

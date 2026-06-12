@@ -43,7 +43,7 @@ const handleWebhook = async (req, res) => {
         await query(
           `INSERT INTO pull_requests (repo_id, github_pr_id, title, author, status, ai_review, ai_review_status, additions, deletions, reviewed_at)
            SELECT id, $2, $3, $4, 'open', $5, 'completed', $6, $7, NOW() FROM repositories WHERE github_repo_id = $1
-           ON CONFLICT DO NOTHING`,
+           ON CONFLICT (repo_id, github_pr_id) DO UPDATE SET title = EXCLUDED.title, ai_review = EXCLUDED.ai_review, ai_review_status = EXCLUDED.ai_review_status, additions = EXCLUDED.additions, deletions = EXCLUDED.deletions, reviewed_at = EXCLUDED.reviewed_at`,
           [repository.id.toString(), pull_request.number, pull_request.title, pull_request.user.login, review, pull_request.additions, pull_request.deletions]
         );
       } catch (err) {
