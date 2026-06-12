@@ -62,7 +62,7 @@ const githubCallback = async (req, res) => {
 
     // Frontend pe redirect karo tokens ke saath (production mein httpOnly cookies use karenge)
     res.redirect(
-      `http://localhost:3000/auth/success?token=${accessToken}&refresh=${refreshToken}`
+      `${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/success?token=${accessToken}&refresh=${refreshToken}`
     );
   } catch (err) {
     console.error('GitHub OAuth error:', err.response?.data || err.message);
