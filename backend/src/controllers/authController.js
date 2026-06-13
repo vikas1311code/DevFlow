@@ -4,7 +4,7 @@ const { query } = require('../config/db');
 
 // Step 1: User ko GitHub ke authorize page pe redirect karo
 const githubLogin = (req, res) => {
-  const redirectUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=repo,user:email&redirect_uri=http://localhost:5000/api/auth/github/callback`;
+  const redirectUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=repo,user:email&redirect_uri=${process.env.BACKEND_URL}/api/auth/github/callback`;
   res.redirect(redirectUrl);
 };
 
