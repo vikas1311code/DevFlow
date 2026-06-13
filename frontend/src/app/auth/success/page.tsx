@@ -1,9 +1,9 @@
 "use client";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
-export default function AuthSuccess() {
+function AuthSuccessInner() {
   const router = useRouter();
   const params = useSearchParams();
   const { login } = useAuth();
@@ -20,8 +20,16 @@ export default function AuthSuccess() {
   }, []);
 
   return (
+    <p className="font-mono text-sm" style={{ color: "var(--text-muted)" }}>Signing you in...</p>
+  );
+}
+
+export default function AuthSuccess() {
+  return (
     <main className="min-h-screen flex items-center justify-center">
-      <p className="font-mono text-sm" style={{ color: "var(--text-muted)" }}>Signing you in...</p>
+      <Suspense fallback={<p className="font-mono text-sm" style={{ color: "var(--text-muted)" }}>Loading...</p>}>
+        <AuthSuccessInner />
+      </Suspense>
     </main>
   );
 }
