@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 DevFlow
+# DevFlow
 
 ### AI-powered pull request reviewer, sprint board & analytics — for developer teams who ship fast.
 
