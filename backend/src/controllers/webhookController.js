@@ -4,6 +4,7 @@ const { getPRFiles, postPRComment } = require('../services/githubService');
 const { reviewCode } = require('../services/aiReviewService');
 const { calculateRisk } = require('../services/riskService');
 const { tryAutoFix } = require('../services/autoFixService');
+const { updateDeveloperProfile } = require('../services/personalityService');
 
 const verifySignature = (payload, signature, secret) => {
   if (!signature) return false;
@@ -65,6 +66,11 @@ const handleWebhook = async (req, res) => {
           await postPRComment(owner, repo, pull_request.number, comment);
           console.log(`✅ ${p.persona} posted!`);
           await new Promise(r => setTimeout(r, 1000));
+        }
+
+        // Developer personality update
+        if (repoId) {
+          await updateDeveloperProfile(repoId, pull_request.user.login, { riskScore: risk.riskScore, additions: pull_request.additions }, risk.filesTouched);
         }
 
         // Auto-fix - security review mein critical issue ho to

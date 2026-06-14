@@ -37,3 +37,16 @@ const getRepoAnalytics = async (req, res) => {
 };
 
 module.exports = { getRepoAnalytics };
+
+const getTeamPersonalities = async (req, res) => {
+  const { repoId } = req.params;
+  try {
+    const { getTeamProfiles } = require('../services/personalityService');
+    const profiles = await getTeamProfiles(repoId);
+    res.json(profiles);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = { getRepoAnalytics, getTeamPersonalities };

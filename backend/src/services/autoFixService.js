@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getFileContent, pushFileFix, postPRComment } = require('./githubService');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 const tryAutoFix = async (owner, repo, prNumber, prBranch, files, securityReview) => {
   // Sirf Critical issues pe auto-fix karo
