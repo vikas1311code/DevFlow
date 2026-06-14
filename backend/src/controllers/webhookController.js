@@ -3,6 +3,7 @@ const { query } = require('../config/db');
 const { getPRFiles, postPRComment } = require('../services/githubService');
 const { reviewCode } = require('../services/aiReviewService');
 const { calculateRisk } = require('../services/riskService');
+const { tryAutoFix } = require('../services/autoFixService');
 
 const verifySignature = (payload, signature, secret) => {
   if (!signature) return false;
@@ -13,22 +14,19 @@ const verifySignature = (payload, signature, secret) => {
 
 const handleWebhook = async (req, res) => {
   const event = req.headers['x-github-event'];
-
   console.log(`📩 GitHub event aaya: ${event}`);
 
   if (event === 'pull_request') {
     const { action, pull_request, repository } = req.body;
     console.log(`PR #${pull_request.number} - ${action}`);
-    console.log(`Title: ${pull_request.title}`);
-    console.log(`Repo: ${repository.full_name}`);
 
     res.status(200).json({ received: true });
 
     if (action === 'opened' || action === 'synchronize') {
       const [owner, repo] = repository.full_name.split('/');
+      const prBranch = pull_request.head.ref;
 
       try {
-        // repo_id lookup karo
         const repoRow = await query(
           'SELECT id FROM repositories WHERE github_repo_id = $1',
           [repository.id.toString()]
@@ -42,23 +40,37 @@ const handleWebhook = async (req, res) => {
         let risk = { riskScore: 0, hotFiles: [], filesTouched: files.map(f => f.filename) };
         if (repoId) {
           risk = await calculateRisk(repoId, files);
-          console.log(`⚠️  Risk score: ${risk.riskScore}/100, hot files: ${risk.hotFiles.join(', ') || 'none'}`);
+          console.log(`⚠️  Risk score: ${risk.riskScore}/100`);
         }
 
-        console.log('🧠 Gemini se review generate kar rahe hain...');
-        let review = await reviewCode(pull_request.title, files);
+        console.log('🧠 Multi-persona AI reviews generate kar rahe hain...');
+        const reviews = await reviewCode(pull_request.title, files);
 
-        // Risk/blast-radius section AI review ke neeche append karo (code-computed, AI se nahi)
+        // Main review + blast radius
+        const mainReview = reviews[0];
         const riskEmoji = risk.riskScore >= 70 ? '🔴' : risk.riskScore >= 40 ? '🟡' : '🟢';
-        review += `\n\n---\n### ${riskEmoji} Blast Radius\n**Risk Score: ${risk.riskScore}/100** · ${risk.filesTouched.length} file(s) touched`;
+        let mainComment = `🤖 **DevFlow AI Review**\n\n${mainReview.review}\n\n---\n*Powered by DevFlow + Gemini AI*`;
+        mainComment += `\n\n---\n### ${riskEmoji} Blast Radius\n**Risk Score: ${risk.riskScore}/100** · ${risk.filesTouched.length} file(s) touched`;
         if (risk.hotFiles.length > 0) {
-          review += `\n⚠️ **Hot files** (frequently changed, higher regression risk): ${risk.hotFiles.map(f => `\`${f}\``).join(', ')}`;
+          mainComment += `\n⚠️ **Hot files**: ${risk.hotFiles.map(f => `\`${f}\``).join(', ')}`;
         }
 
-        console.log('💬 Review comment post kar rahe hain...');
-        await postPRComment(owner, repo, pull_request.number, review);
+        await postPRComment(owner, repo, pull_request.number, mainComment);
+        console.log('✅ Main review posted!');
 
-        console.log('✅ AI review successfully posted!');
+        // Persona reviews
+        const securityReview = reviews.find(r => r.persona.includes('Security'));
+        for (const p of reviews.slice(1)) {
+          const comment = `### ${p.persona}\n\n${p.review}`;
+          await postPRComment(owner, repo, pull_request.number, comment);
+          console.log(`✅ ${p.persona} posted!`);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+
+        // Auto-fix - security review mein critical issue ho to
+        if (securityReview) {
+          await tryAutoFix(owner, repo, pull_request.number, prBranch, files, securityReview.review);
+        }
 
         if (repoId) {
           await query(
@@ -68,16 +80,16 @@ const handleWebhook = async (req, res) => {
                title = EXCLUDED.title, ai_review = EXCLUDED.ai_review, ai_review_status = EXCLUDED.ai_review_status,
                additions = EXCLUDED.additions, deletions = EXCLUDED.deletions, risk_score = EXCLUDED.risk_score,
                files_touched = EXCLUDED.files_touched, reviewed_at = EXCLUDED.reviewed_at`,
-            [repoId, pull_request.number, pull_request.title, pull_request.user.login, review, pull_request.additions, pull_request.deletions, risk.riskScore, risk.filesTouched]
+            [repoId, pull_request.number, pull_request.title, pull_request.user.login, mainComment, pull_request.additions, pull_request.deletions, risk.riskScore, risk.filesTouched]
           );
         }
       } catch (err) {
-        console.error('❌ AI review error:', err.response?.data || err.message);
+        console.error('❌ Error:', err.response?.data || err.message);
       }
     }
     return;
   } else if (event === 'ping') {
-    console.log('✅ Webhook ping received - setup successful!');
+    console.log('✅ Webhook ping received!');
   }
 
   res.status(200).json({ received: true });
