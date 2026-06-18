@@ -32,6 +32,18 @@ interface Issue {
   assignee: string | null;
 }
 
+interface TeamProfile {
+  username: string;
+  personality: string;
+  personality_emoji: string;
+  total_prs: number;
+  avg_risk_score: number;
+  avg_files_per_pr: number;
+  avg_additions: number;
+  docs_prs: number;
+  last_updated: string;
+}
+
 interface Analytics {
   prStats: {
     total_prs: string;
@@ -66,7 +78,9 @@ export default function RepoDetail() {
   const toast = useToast();
   const repoId = params.repoId as string;
 
-  const [tab, setTab] = useState<"overview" | "board" | "settings">("overview");
+  const [tab, setTab] = useState<"overview" | "board" | "team" | "settings">("overview");
+  const [teamProfiles, setTeamProfiles] = useState<TeamProfile[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -98,6 +112,20 @@ export default function RepoDetail() {
       Promise.all([fetchAnalytics(), fetchIssues()]).finally(() => setDataLoading(false));
     }
   }, [user]);
+
+  const fetchTeamProfiles = async () => {
+    setTeamLoading(true);
+    try {
+      const res = await api.get(`/analytics/team/${repoId}`);
+      setTeamProfiles(res.data);
+    } catch {} finally {
+      setTeamLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "team" && user && teamProfiles.length === 0) fetchTeamProfiles();
+  }, [tab, user]);
 
   const addIssue = async () => {
     if (!newTitle.trim()) return;
@@ -188,9 +216,8 @@ export default function RepoDetail() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10">
-        {/* Tabs */}
         <div className="flex gap-1 mb-8 border-b overflow-x-auto" style={{ borderColor: "var(--border)" }}>
-          {(["overview", "board", "settings"] as const).map((t) => (
+          {(["overview", "board", "team", "settings"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -200,7 +227,7 @@ export default function RepoDetail() {
                 color: tab === t ? "var(--text)" : "var(--text-muted)",
               }}
             >
-              {t === "overview" ? "Overview" : t === "board" ? "Sprint board" : "Settings"}
+              {t === "overview" ? "Overview" : t === "board" ? "Sprint board" : t === "team" ? "Team personalities" : "Settings"}
             </button>
           ))}
         </div>
@@ -354,9 +381,92 @@ export default function RepoDetail() {
           </div>
         )}
 
+        {tab === "team" && (
+          <div className="animate-fade-in">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="font-display font-semibold text-lg">Team Personalities</h2>
+                <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  AI-assigned roles based on PR patterns & code behaviour
+                </p>
+              </div>
+              <button
+                onClick={fetchTeamProfiles}
+                className="text-xs font-mono px-3 py-1.5 rounded-md border transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+              >
+                Refresh
+              </button>
+            </div>
+            {teamLoading ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1,2,3].map(i => (
+                  <div key={i} className="p-5 rounded-lg border animate-pulse" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                    <div className="h-10 w-10 rounded-full mb-3" style={{ background: "var(--surface-hover)" }} />
+                    <div className="h-4 w-24 rounded mb-2" style={{ background: "var(--surface-hover)" }} />
+                    <div className="h-3 w-full rounded" style={{ background: "var(--surface-hover)" }} />
+                  </div>
+                ))}
+              </div>
+            ) : teamProfiles.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <span className="text-5xl mb-4">👥</span>
+                <p className="font-display font-semibold mb-1">No profiles yet</p>
+                <p className="text-sm max-w-xs" style={{ color: "var(--text-muted)" }}>
+                  Personalities are assigned automatically when PRs are merged through DevFlow. Merge a PR to see your team here.
+                </p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {teamProfiles.map((profile) => (
+                  <div
+                    key={profile.username}
+                    className="p-5 rounded-lg border transition-all hover:border-[var(--accent)] hover:-translate-y-0.5"
+                    style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="text-4xl">{profile.personality_emoji}</div>
+                      <span
+                        className="text-xs font-mono px-2 py-0.5 rounded-full mt-1"
+                        style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                      >
+                        {profile.personality}
+                      </span>
+                    </div>
+                    <p className="font-display font-semibold mb-0.5">{profile.username}</p>
+                    <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+                      {profile.personality === "Cowboy" && "Ships fast, breaks things. High risk, high reward."}
+                      {profile.personality === "Sniper" && "Laser focused. Small, precise, low-risk changes only."}
+                      {profile.personality === "Documenter" && "The team MVP. Always keeps docs and comments up to date."}
+                      {profile.personality === "Guardian" && "Security-first mindset. Catches issues others miss."}
+                      {profile.personality === "Architect" && "Big thinker. Large structured changes with clear intent."}
+                      {profile.personality === "Balanced" && "Steady and consistent. The backbone of the team."}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: "PRs", value: profile.total_prs },
+                        { label: "Avg Risk", value: `${Math.round(profile.avg_risk_score)}` },
+                        { label: "Files/PR", value: `${Math.round(profile.avg_files_per_pr)}` },
+                      ].map((stat) => (
+                        <div
+                          key={stat.label}
+                          className="rounded-md p-2 text-center"
+                          style={{ background: "var(--bg)" }}
+                        >
+                          <p className="font-display font-semibold text-sm">{stat.value}</p>
+                          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{stat.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === "settings" && (
           <div className="animate-fade-in space-y-6 max-w-2xl">
-            {/* Webhook setup */}
             <div className="rounded-lg border p-5" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
               <p className="font-display font-semibold text-sm mb-1">Webhook setup</p>
               <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
@@ -386,7 +496,6 @@ export default function RepoDetail() {
               </p>
             </div>
 
-            {/* Danger zone */}
             <div className="rounded-lg border p-5" style={{ borderColor: "var(--danger)", background: "var(--surface)" }}>
               <p className="font-display font-semibold text-sm mb-1" style={{ color: "var(--danger)" }}>Danger zone</p>
               <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
