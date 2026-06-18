@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS pull_requests (
 CREATE TABLE IF NOT EXISTS issues (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   repo_id UUID REFERENCES repositories(id) ON DELETE CASCADE,
-  github_issue_id INTEGER NOT NULL,
+  github_issue_id INTEGER DEFAULT 0,
   title TEXT NOT NULL,
   body TEXT,
   status VARCHAR(20) DEFAULT 'open',
@@ -52,3 +52,31 @@ CREATE TABLE IF NOT EXISTS issues (
 CREATE INDEX IF NOT EXISTS idx_pr_repo ON pull_requests(repo_id);
 CREATE INDEX IF NOT EXISTS idx_pr_status ON pull_requests(status);
 CREATE INDEX IF NOT EXISTS idx_issues_repo ON issues(repo_id);
+
+CREATE TABLE IF NOT EXISTS file_churn (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  repo_id UUID REFERENCES repositories(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  change_count INTEGER DEFAULT 1,
+  last_changed TIMESTAMP DEFAULT NOW(),
+  UNIQUE (repo_id, filename)
+);
+
+CREATE INDEX IF NOT EXISTS idx_churn_repo ON file_churn(repo_id);
+
+CREATE TABLE IF NOT EXISTS developer_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  repo_id UUID REFERENCES repositories(id) ON DELETE CASCADE,
+  username VARCHAR(100) NOT NULL,
+  personality VARCHAR(50) DEFAULT 'Balanced',
+  personality_emoji VARCHAR(10) DEFAULT '⚖️',
+  total_prs INTEGER DEFAULT 0,
+  avg_risk_score NUMERIC(5,2) DEFAULT 0,
+  avg_files_per_pr NUMERIC(5,2) DEFAULT 0,
+  avg_additions NUMERIC(8,2) DEFAULT 0,
+  docs_prs INTEGER DEFAULT 0,
+  last_updated TIMESTAMP DEFAULT NOW(),
+  UNIQUE (repo_id, username)
+);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_repo ON developer_profiles(repo_id);
